@@ -7,6 +7,7 @@ This directory contains Python scripts for working with `.docx` files.
 The tools provided are:
 - **`converter.py`**: Converts `.docx` files to and from the OpenXML format (a directory structure of XML files). This is useful for inspecting or programmatically modifying the underlying XML content of a Word document.
 - **`redactor.py`**: Redacts specified strings within a `.docx` file or its `document.xml` component. It replaces target strings with asterisks (`*`) while preserving XML structure and formatting, even when text is split across multiple XML elements.
+- **`redactor_track_changes.py`**: Similar to `redactor.py` but applies Word's Track Changes markup to redacted content, showing deletions with strikethrough and insertions as underlined asterisks.
 
 ## `converter.py`
 
@@ -150,14 +151,13 @@ strings_to_redact = ["John Doe", "Project Phoenix", "SSN: 123-45-6789"]
 # Assume 'source_openxml/word/document.xml' is the path to your document.xml
 # and 'redacted_openxml/word/document.xml' is where you want to save it.
 # Ensure the output directory exists or handle its creation.
-# For simplicity, this example assumes it's run after converter.py has extracted a docx.
 # Path("redacted_openxml/word").mkdir(parents=True, exist_ok=True) # Example directory creation
-# redactor.redact_document_xml(
-# "source_openxml/word/document.xml",
-# strings_to_redact,
-# "redacted_openxml/word/document_redacted.xml",
-# case_sensitive=True
-# )
+redactor.redact_document_xml(
+    "source_openxml/word/document.xml",
+    strings_to_redact,
+    "redacted_openxml/word/document_redacted.xml",
+    case_sensitive=True
+)
 
 # Example 2: Redact an entire .docx file
 input_docx = "mydocument.docx" # Replace with your .docx file
@@ -170,6 +170,89 @@ success = redactor.redact_docx_file(
 )
 if success:
     print(f"Successfully redacted {input_docx} and saved to {output_docx}")
+
+# Example 3: Debug document structure (using an extracted document.xml)
+# redactor.debug_document_structure("source_openxml/word/document.xml")
+```
+
+## `redactor_track_changes.py`
+
+### Purpose
+
+The `DocumentXMLTrackChangesRedactor` class in `redactor_track_changes.py` provides an alternative approach to redaction by applying Word's Track Changes markup to redacted content. Instead of simply replacing text with asterisks, it shows the original text as deleted (with strikethrough) and the asterisks as inserted (with underline). This allows for better visibility of what was redacted while still obscuring the sensitive information.
+
+### Features
+
+- **Track Changes Markup**: Applies proper Word Track Changes formatting to redacted content.
+- **Visible Redactions**: Shows original text as deleted (strikethrough) and asterisks as inserted (underlined).
+- **Metadata Preservation**: Maintains proper Track Changes metadata (author, date, revision ID).
+- **Handles Split Text**: Correctly redacts text even if it's fragmented across multiple XML elements.
+- **Preserves Formatting**: Modifies only the text content, leaving XML structure and associated formatting intact.
+- **Case Sensitivity**: Supports both case-sensitive and case-insensitive redaction.
+- **Operates on `document.xml` or `.docx`**: Can redact a standalone `document.xml` file or an entire `.docx` package.
+- **Debugging**: Includes a method to print the structure of paragraphs and their text elements.
+
+### Usage
+
+#### Command-Line Interface
+
+The script can be run from the command line:
+
+```bash
+python docx_tools/redactor_track_changes.py <file> <string1> [<string2> ...] [-o <output>] [-c] [--docx] [--debug]
+```
+
+- **`file`**: Path to the `document.xml` file or `.docx` file.
+- **`strings`**: One or more strings to redact with track changes.
+- **`-o, --output <output>`** (optional): Path for the output redacted file. If not provided, the input `.docx` file will be overwritten with a `_track_changes` suffix, or the `document.xml` file will be overwritten directly.
+- **`-c, --case-insensitive`** (optional): Perform case-insensitive matching. Default is case-sensitive.
+- **`--docx`** (optional): Explicitly treat the input file as a `.docx` file. The script also infers this if the file ends with `.docx`.
+- **`--debug`** (optional): Show the document structure (first 5 paragraphs of `document.xml`) for debugging purposes. Not for `.docx` files directly.
+
+**Examples:**
+
+1.  **Redact strings in `document.xml` with track changes (case-sensitive):**
+    ```bash
+    python docx_tools/redactor_track_changes.py path/to/your/document.xml "Secret Phrase" "Confidential Info"
+    ```
+
+2.  **Redact strings in a `.docx` file with track changes (case-insensitive) and save to a new file:**
+    ```bash
+    python docx_tools/redactor_track_changes.py mydocument.docx "Client Name" "Project Alpha" -o mydocument_track_changes.docx -c
+    ```
+
+3.  **Debug `document.xml` structure:**
+    ```bash
+    python docx_tools/redactor_track_changes.py path/to/your/document.xml --debug
+    ```
+
+#### Programmatic Usage
+
+```python
+from docx_tools.redactor_track_changes import DocumentXMLTrackChangesRedactor
+
+redactor = DocumentXMLTrackChangesRedactor()
+strings_to_redact = ["John Doe", "Project Phoenix", "SSN: 123-45-6789"]
+
+# Example 1: Redact strings in document.xml with track changes
+redactor.redact_document_xml(
+    "source_openxml/word/document.xml",
+    strings_to_redact,
+    "source_openxml/word/document_track_changes.xml",
+    case_sensitive=True
+)
+
+# Example 2: Redact an entire .docx file with track changes
+input_docx = "mydocument.docx"  # Replace with your .docx file
+output_docx = "mydocument_track_changes.docx"
+success = redactor.redact_docx_file(
+    input_docx,
+    strings_to_redact,
+    output_docx,
+    case_sensitive=False  # Case-insensitive redaction
+)
+if success:
+    print(f"Successfully applied track changes to {input_docx} and saved to {output_docx}")
 
 # Example 3: Debug document structure (using an extracted document.xml)
 # redactor.debug_document_structure("source_openxml/word/document.xml")
